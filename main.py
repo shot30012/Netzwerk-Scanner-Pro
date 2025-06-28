@@ -1,7 +1,14 @@
+# main.py - Vollständige Version mit GUI und Build-Logik
+
 import sys
 import os
 import csv
-# KORRIGIERTER IMPORT HIER: 'Slot' wurde für den Worker-Thread hinzugefügt.
+import platform
+import shutil
+import subprocess
+from typing import List, Tuple, Optional, Callable
+
+# PySide6 Imports
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Qt, QSize, QThread, Slot
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtWidgets import (
@@ -12,16 +19,20 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog
 )
 
-# Wir gehen davon aus, dass diese Engine-Datei existiert und die Funktionen bereitstellt.
-from scanner_engine import get_network_info, discover_hosts, scan_single_port, parse_ports
+# Eigene Engine-Imports
+from scanner_engine import (
+    get_network_info, discover_hosts, scan_single_port, parse_ports, check_nmap_availability
+)
 
 def resource_path(relative_path):
+    """ Ermittelt den korrekten Pfad zu Ressourcen, funktioniert für Skript und .exe """
     try:
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
+# Dark Style Theme für die Anwendung
 DARK_STYLE = """
     QWidget { background-color: #2b2b2b; color: #f0f0f0; font-family: Segoe UI, Arial, sans-serif; }
     QGroupBox { font-weight: bold; border: 1px solid #444; border-radius: 4px; margin-top: 10px; }
@@ -44,12 +55,16 @@ DARK_STYLE = """
     QMenu::item:selected { background-color: #007acc; }
 """
 
+# --- Worker Klassen für Threading ---
+
 class WorkerSignals(QObject):
+    """ Signale für den PortScanWorker """
     result = Signal(dict)
     progress = Signal()
     finished = Signal()
 
 class PortScanWorker(QRunnable):
+    """ Worker für das Scannen eines einzelnen Ports """
     def __init__(self, target_ip, port):
         super().__init__()
         self.target_ip = target_ip
@@ -62,10 +77,8 @@ class PortScanWorker(QRunnable):
             self.signals.result.emit(result)
         self.signals.progress.emit()
 
-# KORREKTUR: Die unsichere HostScanThread-Klasse wurde durch ein Worker/QThread-Muster ersetzt.
-# Dies ist der von Qt empfohlene Weg für langlebige Aufgaben, um ein sicheres Beenden
-# zu ermöglichen und die GUI nicht zu blockieren.
 class HostScanWorker(QObject):
+    """ Worker für die Host-Suche """
     update_signal = Signal(str)
     finished = Signal()
 
@@ -76,19 +89,14 @@ class HostScanWorker(QObject):
 
     @Slot()
     def run(self):
-        """ Führt den Host-Scan durch. """
-        # HINWEIS: Damit der "Stop"-Button diesen Host-Scan effektiv unterbrechen kann,
-        # muss die zugrunde liegende Funktion 'discover_hosts' eine Abbruchmöglichkeit unterstützen.
-        # Ein einfacher blockierender Aufruf von 'discover_hosts' verhindert, dass der Scan
-        # angehalten wird, bis er von selbst abgeschlossen ist.
-        discover_hosts(self.target, self.update_signal)
+        discover_hosts(self.target, self.update_signal, lambda: self._is_stopping)
         if not self._is_stopping:
             self.finished.emit()
 
     def stop(self):
-        """ Signalisiert dem Worker, dass er anhalten soll. """
         self._is_stopping = True
 
+# --- Hauptfenster der Anwendung ---
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -97,10 +105,8 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(resource_path("icons/target.svg")))
         self.setGeometry(100, 100, 1400, 800)
         
-        # Worker und Thread für den Host-Scan
         self.host_scan_worker = None
         self.host_scan_thread = None
-        
         self.current_scan_target = None
         self.ports_to_scan_total = 0
         self.ports_scanned_count = 0
@@ -111,6 +117,35 @@ class MainWindow(QMainWindow):
         self._create_actions()
         self._create_menu_bar()
         self._create_main_widget()
+
+        # Nmap-Check beim Start
+        if not check_nmap_availability():
+            self.show_nmap_warning()
+            try:
+                self.hosts_list.itemClicked.disconnect(self.start_port_scan)
+                self.hosts_list.setToolTip("Port-Scans sind deaktiviert, da Nmap nicht gefunden wurde.")
+            except RuntimeError:
+                pass # Falls Verbindung schon getrennt war
+
+    def show_nmap_warning(self):
+        """ Zeigt eine Warnung mit plattformspezifischen Anweisungen an, wenn Nmap nicht gefunden wird. """
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setWindowTitle("Nmap nicht gefunden")
+        msg_box.setText("<b>Die Kernkomponente 'Nmap' wurde nicht gefunden.</b>")
+        
+        system = platform.system().lower()
+        if system == 'darwin': # macOS
+            instruction = "Bitte installieren Sie es mit Homebrew: <br><code>brew install nmap</code>"
+        elif system == 'linux':
+            instruction = "Bitte installieren Sie es mit dem Paketmanager Ihrer Distribution, z.B.: <br><code>sudo apt-get install nmap</code> (für Debian/Ubuntu) <br><code>sudo dnf install nmap</code> (für Fedora)"
+        else: # Windows
+            instruction = "Bitte installieren Sie Nmap von <a href='https://nmap.org/download.html'>nmap.org</a> und stellen Sie sicher, dass es im System-PATH ist.<br>(Sollte durch den Installer automatisch erledigt werden.)"
+
+        msg_box.setInformativeText(f"Die Port-Scan-Funktionen sind deaktiviert, bis Nmap installiert ist.<br><br>{instruction}")
+        msg_box.setTextFormat(Qt.RichText)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec()
 
     def _create_main_widget(self):
         self.scan_icon = QIcon(resource_path("icons/search.svg"))
@@ -233,18 +268,12 @@ class MainWindow(QMainWindow):
         help_menu.addAction(self.about_action)
 
     def show_about_dialog(self):
-        QMessageBox.about(self, "Über Netzwerk-Scanner Pro", "<b>Netzwerk-Scanner Pro v2.0</b><p>Ein mächtiger, grafischer Netzwerk-Scanner.</p><p>Entwickelt von: Dir!</p><p>Dieses Tool nutzt die Nmap Security Scanner Engine. Großer Dank an das Nmap-Projekt (nmap.org).</p><p>GUI erstellt mit dem Qt Framework über PySide6.</p>")
+        QMessageBox.about(self, "Über Netzwerk-Scanner Pro", "<b>Netzwerk-Scanner Pro v1.0</b><p>Ein grafischer Netzwerk-Scanner für Windows, macOS und Linux.</p><p>GUI erstellt mit dem Qt Framework über PySide6.</p>")
     
     def stop_scans(self):
-        """Stoppt alle laufenden Scans auf sichere Weise."""
-        # Host-Scan anhalten
         if self.host_scan_thread and self.host_scan_thread.isRunning():
             self.host_scan_worker.stop()
         
-        # Port-Scans anhalten
-        # KORREKTUR: waitForDone() wird entfernt, da es die GUI blockiert.
-        # clear() verhindert, dass neue Aufgaben gestartet werden.
-        # Die bereits laufenden Tasks (max. 50) laufen zu Ende.
         self.threadpool.clear()
         
         self.scan_button.setEnabled(True)
@@ -252,6 +281,10 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Alle Scans vom Benutzer abgebrochen.")
 
     def start_host_scan(self):
+        if not check_nmap_availability():
+            self.show_nmap_warning()
+            return
+            
         self.stop_scans()
         self.hosts_list.clear()
         self.details_table.setRowCount(0)
@@ -266,22 +299,15 @@ class MainWindow(QMainWindow):
         self.scan_button.setEnabled(False)
         self.stop_button.setEnabled(True)
 
-        # KORREKTUR: Worker/Thread-Pattern für sichere Ausführung und Beendigung
         self.host_scan_thread = QThread()
         self.host_scan_worker = HostScanWorker(target)
         self.host_scan_worker.moveToThread(self.host_scan_thread)
-
         self.host_scan_thread.started.connect(self.host_scan_worker.run)
         self.host_scan_worker.finished.connect(self.host_scan_thread.quit)
-        
-        # Signale für UI-Updates verbinden
         self.host_scan_worker.update_signal.connect(self.handle_host_scan_update)
         self.host_scan_worker.finished.connect(self.host_scan_finished)
-        
-        # KORREKTUR: Ressourcen nach Beendigung freigeben, um Speicherlecks zu vermeiden
         self.host_scan_worker.finished.connect(self.host_scan_worker.deleteLater)
         self.host_scan_thread.finished.connect(self.host_scan_thread.deleteLater)
-        
         self.host_scan_thread.start()
 
     def handle_host_scan_update(self, message):
@@ -299,7 +325,7 @@ class MainWindow(QMainWindow):
             self.status_label.setText(f"<font color='#FF5733'>FEHLER: {message.split(':', 1)[1]}</font>")
     
     def host_scan_finished(self):
-        if not self.stop_button.isEnabled(): # Prüft, ob der Scan nicht manuell gestoppt wurde
+        if not self.stop_button.isEnabled():
             return
             
         self.scan_button.setEnabled(True)
@@ -309,7 +335,6 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Host-Scan beendet. Keine aktiven Hosts gefunden.")
         else:
             self.status_label.setText(f"Host-Scan beendet. {self.hosts_list.count()} Host(s) gefunden.")
-
 
     def start_port_scan(self, item):
         self.stop_scans()
@@ -397,9 +422,101 @@ class MainWindow(QMainWindow):
         else:
             self.target_input.setText("127.0.0.1")
 
+# ==============================================================================
+# BUILD-LOGIK
+# ==============================================================================
+
+def run_build_command(command):
+    """Führt einen Befehl im Terminal aus und gibt den Output live aus."""
+    print(f"--- Führe aus: {' '.join(command)} ---")
+    try:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+        rc = process.poll()
+        if rc != 0:
+            print(f"--- FEHLER: Befehl schlug mit Code {rc} fehl. ---")
+            sys.exit(rc)
+    except FileNotFoundError:
+        print(f"--- FEHLER: Befehl '{command[0]}' nicht gefunden. Ist das Programm (z.B. PyInstaller) installiert?")
+        sys.exit(1)
+    print(f"--- Befehl erfolgreich ausgeführt. ---")
+
+def build_application():
+    """Startet den plattformspezifischen Build-Prozess."""
+    system = platform.system().lower()
+    app_name = "Netzwerk-Scanner Pro"
+    main_script = "main.py"
+
+    print(f"Starte Build für Plattform: {system.capitalize()}")
+
+    # Bereinige alte Build-Ordner
+    for folder in ["dist", "build"]:
+        if os.path.exists(folder):
+            print(f"Lösche alten Ordner: {folder}")
+            shutil.rmtree(folder)
+
+    # Basis-Befehl für PyInstaller
+    base_command = [
+        "pyinstaller",
+        "--name", app_name,
+        "--noconfirm",
+        "--windowed", # Versteckt das Konsolenfenster bei der Ausführung
+        main_script
+    ]
+    
+    # Plattformspezifische Anpassungen
+    if system == "windows":
+        print(">>> Konfiguriere für Windows...")
+        command = base_command + [
+            "--onefile",
+            f"--icon={os.path.join('icons', 'target.ico')}",
+            "--manifest=admin.manifest"
+        ]
+    elif system == "darwin": # macOS
+        print(">>> Konfiguriere für macOS...")
+        # .app Bundles sind Verzeichnisse, daher ist --onedir implizit besser
+        command = base_command + [
+            f"--icon={os.path.join('icons', 'target.icns')}"
+        ]
+    elif system == "linux":
+        print(">>> Konfiguriere für Linux...")
+        # Für Linux erstellen wir eine One-Folder-Anwendung.
+        command = base_command
+    else:
+        print(f"FEHLER: Nicht unterstütztes Betriebssystem: {system}")
+        sys.exit(1)
+
+    # Führe den PyInstaller-Befehl aus
+    run_build_command(command)
+
+    print("\n========================================================")
+    print(f"Build für {system.capitalize()} erfolgreich abgeschlossen!")
+    print(f"Das Ergebnis befindet sich im Ordner 'dist'.")
+    print("========================================================")
+
+# ==============================================================================
+# Haupt-Einstiegspunkt des Skripts
+# ==============================================================================
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    app.setStyleSheet(DARK_STYLE)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
+    # Prüfen, ob das Build-Argument übergeben wurde
+    if "--build" in sys.argv:
+        # Installiere notwendige Build-Tools, falls nicht vorhanden
+        try:
+            import PyInstaller
+        except ImportError:
+            print("PyInstaller nicht gefunden. Installiere...")
+            run_build_command([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        
+        build_application()
+    else:
+        # Normaler Start der GUI-Anwendung
+        app = QApplication(sys.argv)
+        app.setStyleSheet(DARK_STYLE)
+        window = MainWindow()
+        window.show()
+        sys.exit(app.exec())

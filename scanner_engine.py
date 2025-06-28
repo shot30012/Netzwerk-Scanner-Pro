@@ -1,23 +1,25 @@
+# scanner_engine.py - Plattformübergreifende Version
+
 import socket
 import netifaces
 import ipaddress
 import platform
 import subprocess
 import xml.etree.ElementTree as ET
+import shutil  # Wichtig für die Nmap-Prüfung
 from typing import List, Tuple, Optional, Callable
+
+def check_nmap_availability() -> bool:
+    """
+    Prüft, ob der 'nmap'-Befehl im System-PATH verfügbar ist.
+    Gibt True zurück, wenn nmap gefunden wird, sonst False.
+    """
+    return shutil.which("nmap") is not None
 
 def get_network_info() -> Tuple[Optional[str], Optional[str]]:
     """
-    Ermittelt die lokale IP-Adresse und den Netzwerkbereich des primären aktiven Adapters.
-
-    Versucht zuerst, den Standard-Gateway zu finden, um die primäre Schnittstelle zu identifizieren.
-    Wenn das fehlschlägt, durchläuft es alle Schnittstellen und gibt das erste gefundene
-    Nicht-Loopback-Netzwerk zurück.
-
-    Returns:
-        Ein Tupel (local_ip, network_range_cidr).
-        Beispiel: ('192.168.1.10', '192.168.1.0/24').
-        Gibt (None, None) zurück, wenn keine Informationen gefunden werden konnten.
+    Ermittelt die lokale IP-Adresse und den Netzwerkbereich.
+    Diese Funktion ist bereits plattformunabhängig.
     """
     try:
         # Versuch 1: Über den Standard-Gateway (zuverlässigste Methode)
@@ -52,21 +54,10 @@ def get_network_info() -> Tuple[Optional[str], Optional[str]]:
 
 def discover_hosts(network_range: str, progress_callback: Callable, is_stopping_func: Callable[[], bool] = lambda: False):
     """
-    Sucht nach aktiven Hosts in einem bestimmten Netzwerkbereich mittels Ping.
-
-    Diese Funktion ist so konzipiert, dass sie kooperativ abgebrochen werden kann.
-
-    Args:
-        network_range: Der zu scannende Netzwerkbereich in CIDR-Notation (z.B. "192.168.1.0/24").
-        progress_callback: Ein Signal-Emitter (z.B. `Signal.emit`), um Updates an die GUI zu senden.
-        is_stopping_func: Eine Funktion, die True zurückgibt, wenn der Scan abgebrochen werden soll.
-                          Dies ermöglicht ein sauberes Beenden durch die GUI.
+    Sucht nach aktiven Hosts in einem bestimmten Netzwerkbereich mittels Ping (plattformübergreifend).
     """
     try:
         network = ipaddress.ip_network(network_range, strict=False)
-        
-        # Bestimme die Liste der zu scannenden Hosts.
-        # Für /32-Netze enthält .hosts() nichts, also scannen wir die Adresse selbst.
         if network.num_addresses > 1:
             hosts_to_scan = list(network.hosts())
         else:
@@ -77,52 +68,52 @@ def discover_hosts(network_range: str, progress_callback: Callable, is_stopping_
             progress_callback.emit("error:Keine gültigen Hosts zum Scannen in diesem Bereich.")
             return
 
+        system = platform.system().lower()
+
         for i, host in enumerate(hosts_to_scan):
-            # KORREKTUR: Prüfen, ob der Scan vom Benutzer abgebrochen wurde.
             if is_stopping_func():
-                print("Host-Scan wurde abgebrochen.")
-                break # Die Schleife sicher verlassen.
+                break
 
             host_str = str(host)
             
-            # Betriebssystemspezifischer Ping-Befehl
-            if platform.system().lower() == 'windows':
+            # Plattformspezifische Ping-Befehle
+            if system == 'windows':
                 command = ['ping', '-n', '1', '-w', '1000', host_str]
-            else:
+            elif system == 'darwin':  # macOS
+                command = ['ping', '-c', '1', '-t', '1', host_str]
+            else:  # Linux und andere
                 command = ['ping', '-c', '1', '-W', '1', host_str]
             
-            # Verhindert das Aufpoppen von Konsolenfenstern unter Windows
+            # startupinfo ist nur für Windows, um das Konsolenfenster zu verstecken
             startupinfo = None
-            if platform.system().lower() == 'windows':
+            if system == 'windows':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = subprocess.SW_HIDE
             
             try:
-                # Führe den Ping-Befehl aus
                 response = subprocess.run(
                     command, 
                     stdout=subprocess.DEVNULL, 
                     stderr=subprocess.DEVNULL, 
                     startupinfo=startupinfo, 
-                    check=False
+                    check=False,
+                    timeout=2 # Timeout für den Ping-Befehl
                 )
                 
                 if response.returncode == 0:
                     hostname = ""
                     try:
-                        # Versuche, den Hostnamen via Reverse-DNS-Lookup aufzulösen
+                        # Reverse-DNS-Lookup
                         data = socket.gethostbyaddr(host_str)
                         hostname = data[0]
                     except (socket.herror, socket.gaierror):
-                        # Hostname konnte nicht aufgelöst werden, das ist okay.
                         hostname = ""
                     progress_callback.emit(f"host_found:{host_str}|||{hostname}")
-            except Exception as e:
-                # Unerwarteter Fehler beim Pingen
-                print(f"Unerwarteter Fehler bei Ping an {host_str}: {e}")
+            except (subprocess.TimeoutExpired, Exception) as e:
+                # Fehler oder Timeout einfach ignorieren und weitermachen
+                print(f"Fehler oder Timeout bei Ping an {host_str}: {e}")
 
-            # Fortschritt an die GUI senden
             progress = int(((i + 1) / total_hosts) * 100)
             progress_callback.emit(f"progress:{progress}")
 
@@ -130,21 +121,7 @@ def discover_hosts(network_range: str, progress_callback: Callable, is_stopping_
         progress_callback.emit(f"error:Ein Fehler ist aufgetreten: {e}")
 
 def parse_ports(port_string: str) -> List[int]:
-    """
-    Parst einen String mit Portangaben in eine sortierte Liste von Integer-Ports.
-
-    Beispiele für gültige Eingaben:
-    - "80"
-    - "80,443"
-    - "8000-8080"
-    - "22,80,443,8000-8080"
-
-    Args:
-        port_string: Der String mit den Portangaben.
-
-    Returns:
-        Eine sortierte Liste von eindeutigen Portnummern.
-    """
+    """ Parst einen String mit Portangaben. Diese Funktion ist plattformunabhängig. """
     ports = set()
     try:
         parts = [p.strip() for p in port_string.split(',')]
@@ -160,31 +137,17 @@ def parse_ports(port_string: str) -> List[int]:
                 if 0 < port_num < 65536:
                     ports.add(port_num)
     except ValueError:
-        # Bei ungültigen Zeichen (z.B. Buchstaben) wird eine leere Liste zurückgegeben
         return []
     return sorted(list(ports))
 
 def scan_single_port(target_ip: str, port: int) -> Optional[dict]:
-    """
-    Scannt einen einzelnen Port auf einem Ziel-Host mit nmap zur Diensterkennung.
-
-    Führt 'nmap -sV' aus, um den Dienst und die Version zu ermitteln.
-    Der Timeout ist auf 30 Sekunden gesetzt, um zu lange Wartezeiten zu vermeiden.
-
-    Args:
-        target_ip: Die IP-Adresse des Ziels.
-        port: Die zu scannende Portnummer.
-
-    Returns:
-        Ein Dictionary mit den Scan-Ergebnissen, wenn der Port offen ist.
-        Beispiel: {'port': 'tcp/80', 'status': 'open', 'service': 'http', 'details': 'Apache httpd 2.4.41'}
-        Gibt None zurück, wenn der Port geschlossen ist, nmap nicht gefunden wird oder ein Fehler auftritt.
-    """
+    """ Scannt einen einzelnen Port mit nmap (plattformübergreifend). """
     try:
         command = ['nmap', '-sV', '-p', str(port), target_ip, '-oX', '-']
         
+        system = platform.system().lower()
         startupinfo = None
-        if platform.system().lower() == 'windows':
+        if system == 'windows':
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = subprocess.SW_HIDE
@@ -195,7 +158,7 @@ def scan_single_port(target_ip: str, port: int) -> Optional[dict]:
             stderr=subprocess.PIPE, 
             text=True, 
             startupinfo=startupinfo, 
-            timeout=30 # Verhindert, dass der Scan ewig hängt
+            timeout=30
         )
 
         if process.returncode != 0 or not process.stdout:
@@ -224,12 +187,13 @@ def scan_single_port(target_ip: str, port: int) -> Optional[dict]:
             version = service_elem.get('version', '')
             extra_info = service_elem.get('extrainfo', '')
             details = f"{product} {version} {extra_info}".strip()
-            result["details"] = details if details else " " # Leerzeichen um Tabellenzelle zu füllen
+            result["details"] = details if details else " "
             
         return result
         
-    except (FileNotFoundError, ET.ParseError, subprocess.TimeoutExpired):
-        # FileNotFoundError: nmap ist nicht installiert oder nicht im PATH
-        # ET.ParseError: nmap gab eine ungültige XML-Ausgabe zurück
-        # TimeoutExpired: Scan dauerte länger als 30 Sekunden
+    except FileNotFoundError:
+        # Dieser Fehler tritt auf, wenn nmap nicht gefunden wird.
+        print("Fehler: nmap konnte nicht gefunden werden. Stellen Sie sicher, dass es installiert ist.")
+        return None
+    except (ET.ParseError, subprocess.TimeoutExpired):
         return None
