@@ -1,61 +1,76 @@
-# .github/workflows/release-builder.yml
-
+# Der Name unseres Bauplans
 name: Baue Windows & macOS Version
 
+# WANN soll der Roboter starten?
 on:
   release:
     types: [published]
 
+# WAS soll der Roboter tun?
 jobs:
   build:
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
-
     runs-on: ${{ matrix.os }}
 
     steps:
+      # 1. Schritt: Hole den Code
       - name: Lade den Quellcode herunter
         uses: actions/checkout@v4
 
+      # 2. Schritt: Richte die Python-Werkstatt ein
       - name: Installiere Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # 3. Schritt: Installiere die Python-Werkzeuge von der Einkaufsliste
       - name: Installiere Python-Pakete
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # 4. Schritt: Installiere Nmap (nur auf der Mac-Werkbank)
       - name: Installiere Nmap (nur für macOS)
         if: runner.os == 'macOS'
         run: brew install nmap
 
+      # 5. Schritt: Baue das eigentliche Programm zusammen
       - name: Führe das Build-Skript aus
         run: python main.py --build
 
-      - name: Ergebnis verpacken
+      # 6. Schritt: Verpacke das Ergebnis schön
+      - name: Ergebnis verpacken und Dateityp festlegen
         id: package
         run: |
           if ("${{ runner.os }}" -eq "Windows") {
-            $ARTIFACT_PATH = "dist/Netzwerk-Scanner-Pro.exe"
             $ASSET_NAME = "Netzwerk-Scanner-Pro-Windows.exe"
-            mv $ARTIFACT_PATH dist/$ASSET_NAME
+            mv dist/Netzwerk-Scanner-Pro.exe dist/$ASSET_NAME
             echo "ASSET_PATH=dist/$ASSET_NAME" >> $env:GITHUB_ENV
             echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
+            echo "ASSET_CONTENT_TYPE=application/octet-stream" >> $env:GITHUB_ENV
           }
           else {
-            $ARTIFACT_PATH = "dist/Netzwerk-Scanner Pro.app"
             $ASSET_NAME = "Netzwerk-Scanner-Pro-macOS.zip"
             cd dist
             zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
             cd ..
             echo "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_ENV
             echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
+            echo "ASSET_CONTENT_TYPE=application/zip" >> $env:GITHUB_ENV
           }
         shell: pwsh
 
+      # --- NEUER DEBUG-SCHRITT ---
+      # 6.5. Schritt: Überprüfe die Umgebungsvariablen vor dem Upload
+      - name: DEBUG - Zeige die gesetzten Variablen an
+        run: |
+          echo "Pfad der Datei: ${{ env.ASSET_PATH }}"
+          echo "Name der Datei: ${{ env.ASSET_NAME }}"
+          echo "Typ der Datei: ${{ env.ASSET_CONTENT_TYPE }}"
+
+      # 7. Schritt: Lade das fertige Paket zur Release-Seite hoch
       - name: Lade fertiges Paket hoch
         uses: actions/upload-release-asset@v1
         env:
@@ -64,3 +79,4 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ${{ env.ASSET_PATH }}
           asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
