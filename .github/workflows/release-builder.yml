@@ -1,0 +1,66 @@
+# .github/workflows/release-builder.yml
+
+name: Baue Windows & macOS Version
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Lade den Quellcode herunter
+        uses: actions/checkout@v4
+
+      - name: Installiere Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installiere Python-Pakete
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Installiere Nmap (nur für macOS)
+        if: runner.os == 'macOS'
+        run: brew install nmap
+
+      - name: Führe das Build-Skript aus
+        run: python main.py --build
+
+      - name: Ergebnis verpacken
+        id: package
+        run: |
+          if ("${{ runner.os }}" -eq "Windows") {
+            $ARTIFACT_PATH = "dist/Netzwerk-Scanner-Pro.exe"
+            $ASSET_NAME = "Netzwerk-Scanner-Pro-Windows.exe"
+            mv $ARTIFACT_PATH dist/$ASSET_NAME
+            echo "ASSET_PATH=dist/$ASSET_NAME" >> $env:GITHUB_ENV
+            echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
+          }
+          else {
+            $ARTIFACT_PATH = "dist/Netzwerk-Scanner Pro.app"
+            $ASSET_NAME = "Netzwerk-Scanner-Pro-macOS.zip"
+            cd dist
+            zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
+            cd ..
+            echo "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_ENV
+            echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
+          }
+        shell: pwsh
+
+      - name: Lade fertiges Paket hoch
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ${{ env.ASSET_PATH }}
+          asset_name: ${{ env.ASSET_NAME }}
