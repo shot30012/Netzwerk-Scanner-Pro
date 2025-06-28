@@ -7,7 +7,6 @@ Netzwerk-Scanner Pro
 Ein benutzerfreundlicher, grafischer Netzwerk-Scanner für Windows und macOS, geschrieben in Python mit PySide6. Dieses Tool ermöglicht es, schnell und effizient aktive Hosts in einem Netzwerk zu entdecken und deren offene Ports zu überprüfen.
 ![alt text](screenshot-hosts.png)
 
-(Hier könnte ein zweiter Screenshot der Port-Detailansicht gut passen)
 ✨ Hauptfunktionen
 Automatische Netzwerkerkennung: Schlägt beim Start automatisch den lokalen Netzwerkbereich als Scan-Ziel vor.
 Host Discovery: Findet aktive Hosts im Zielnetzwerk und zeigt IP-Adressen sowie (falls auflösbar) Hostnamen an.
