@@ -2,7 +2,7 @@
 
 Ein einfacher, aber leistungsstarker grafischer Netzwerk-Scanner für Windows, geschrieben in Python mit PySide6.
 
-![Screenshot Ihrer Anwendung](link_zum_screenshot.png) <!-- Ersetzen Sie dies später durch einen echten Screenshot -->
+![Screenshot Ihrer Anwendung](NetzwerkScanner-Pro.png) <!-- Ersetzen Sie dies später durch einen echten Screenshot -->
 
 ## Funktionen
 
