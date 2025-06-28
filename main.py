@@ -1,4 +1,4 @@
-# main.py - Vollständige Version mit GUI und Build-Logik
+# main.py - Vollständige Version mit GUI und korrigierter Build-Logik
 
 import sys
 import os
@@ -268,7 +268,7 @@ class MainWindow(QMainWindow):
         help_menu.addAction(self.about_action)
 
     def show_about_dialog(self):
-        QMessageBox.about(self, "Über Netzwerk-Scanner Pro", "<b>Netzwerk-Scanner Pro v1.0</b><p>Ein grafischer Netzwerk-Scanner für Windows, macOS und Linux.</p><p>GUI erstellt mit dem Qt Framework über PySide6.</p>")
+        QMessageBox.about(self, "Über Netzwerk-Scanner Pro", "<b>Netzwerk-Scanner Pro v1.2</b><p>Ein grafischer Netzwerk-Scanner für Windows, macOS und Linux.</p><p>GUI erstellt mit dem Qt Framework über PySide6.</p>")
     
     def stop_scans(self):
         if self.host_scan_thread and self.host_scan_thread.isRunning():
@@ -452,7 +452,11 @@ def build_application():
     app_name = "Netzwerk-Scanner Pro"
     main_script = "main.py"
 
+    # Bestimme den Pfad zum Skriptverzeichnis, um Pfadprobleme zu vermeiden.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
     print(f"Starte Build für Plattform: {system.capitalize()}")
+    print(f"Skriptverzeichnis: {script_dir}")
 
     # Bereinige alte Build-Ordner
     for folder in ["dist", "build"]:
@@ -463,30 +467,30 @@ def build_application():
     # Basis-Befehl für PyInstaller
     base_command = [
         "pyinstaller",
-        "--name", app_name,
         "--noconfirm",
-        "--windowed", # Versteckt das Konsolenfenster bei der Ausführung
+        "--windowed",
         main_script
     ]
+    
+    command = base_command + ["--name", app_name]
     
     # Plattformspezifische Anpassungen
     if system == "windows":
         print(">>> Konfiguriere für Windows...")
-        command = base_command + [
+        command += [
             "--onefile",
-            f"--icon={os.path.join('icons', 'target.ico')}",
-            "--manifest=admin.manifest"
+            "--icon", os.path.join(script_dir, 'icons', 'target.ico'),
+            "--manifest", "admin.manifest"
         ]
     elif system == "darwin": # macOS
         print(">>> Konfiguriere für macOS...")
-        # .app Bundles sind Verzeichnisse, daher ist --onedir implizit besser
-        command = base_command + [
-            f"--icon={os.path.join('icons', 'target.icns')}"
+        command += [
+            "--icon", os.path.join(script_dir, 'icons', 'target.icns')
         ]
     elif system == "linux":
         print(">>> Konfiguriere für Linux...")
-        # Für Linux erstellen wir eine One-Folder-Anwendung.
-        command = base_command
+        # Keine zusätzlichen Optionen für den Basis-Build nötig
+        pass
     else:
         print(f"FEHLER: Nicht unterstütztes Betriebssystem: {system}")
         sys.exit(1)
@@ -505,7 +509,6 @@ def build_application():
 if __name__ == "__main__":
     # Prüfen, ob das Build-Argument übergeben wurde
     if "--build" in sys.argv:
-        # Installiere notwendige Build-Tools, falls nicht vorhanden
         try:
             import PyInstaller
         except ImportError:
