@@ -40,36 +40,32 @@ jobs:
       - name: Führe das Build-Skript aus
         run: python main.py --build
 
-      # 6. Schritt: Verpacke das Ergebnis schön
-      - name: Ergebnis verpacken und Dateityp festlegen
-        id: package
+      # --- ÄNDERUNG HIER: Wir verwenden jetzt Outputs statt env-Variablen ---
+      # 6. Schritt: Verpacke das Ergebnis und erzeuge Outputs
+      - name: Ergebnis verpacken und Outputs festlegen
+        id: package # Die ID ist wichtig, damit wir die Outputs referenzieren können
         run: |
           if ("${{ runner.os }}" -eq "Windows") {
             $ASSET_NAME = "Netzwerk-Scanner-Pro-Windows.exe"
             mv dist/Netzwerk-Scanner-Pro.exe dist/$ASSET_NAME
-            echo "ASSET_PATH=dist/$ASSET_NAME" >> $env:GITHUB_ENV
-            echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
-            echo "ASSET_CONTENT_TYPE=application/octet-stream" >> $env:GITHUB_ENV
+            # Schreibe die Werte in die GITHUB_OUTPUT Datei
+            "ASSET_PATH=dist/$ASSET_NAME" >> $env:GITHUB_OUTPUT
+            "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_OUTPUT
+            "ASSET_CONTENT_TYPE=application/octet-stream" >> $env:GITHUB_OUTPUT
           }
           else {
             $ASSET_NAME = "Netzwerk-Scanner-Pro-macOS.zip"
             cd dist
             zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
             cd ..
-            echo "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_ENV
-            echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
-            echo "ASSET_CONTENT_TYPE=application/zip" >> $env:GITHUB_ENV
+            # Schreibe die Werte in die GITHUB_OUTPUT Datei
+            "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_OUTPUT
+            "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_OUTPUT
+            "ASSET_CONTENT_TYPE=application/zip" >> $env:GITHUB_OUTPUT
           }
         shell: pwsh
 
-      # --- NEUER DEBUG-SCHRITT ---
-      # 6.5. Schritt: Überprüfe die Umgebungsvariablen vor dem Upload
-      - name: DEBUG - Zeige die gesetzten Variablen an
-        run: |
-          echo "Pfad der Datei: ${{ env.ASSET_PATH }}"
-          echo "Name der Datei: ${{ env.ASSET_NAME }}"
-          echo "Typ der Datei: ${{ env.ASSET_CONTENT_TYPE }}"
-
+      # --- ÄNDERUNG HIER: Wir lesen jetzt die Outputs statt env-Variablen ---
       # 7. Schritt: Lade das fertige Paket zur Release-Seite hoch
       - name: Lade fertiges Paket hoch
         uses: actions/upload-release-asset@v1
@@ -77,6 +73,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ${{ env.ASSET_PATH }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+          asset_path: ${{ steps.package.outputs.ASSET_PATH }}
+          asset_name: ${{ steps.package.outputs.ASSET_NAME }}
+          asset_content_type: ${{ steps.package.outputs.ASSET_CONTENT_TYPE }}
