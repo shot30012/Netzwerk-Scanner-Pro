@@ -21,7 +21,7 @@ Ein benutzerfreundlicher, grafischer Netzwerk-Scanner für Windows, geschrieben 
 
 Die neueste Version kann einfach über die Releases-Seite heruntergeladen werden.
 
-1.  Gehen Sie zur **[Releases-Seite](https://github.com/Ihr-GitHub-Benutzername/Netzwerk-Scanner-Pro/releases)**.
+1.  Gehen Sie zur **[Releases-Seite]([https://github.com/shot30012/Netzwerk-Scanner-Pro/releases/tag/v1.0)]**.
 2.  Laden Sie die `Netzwerk-Scanner-Pro-Setup.exe` der aktuellsten Version herunter.
 3.  Führen Sie die Setup-Datei aus und folgen Sie den Anweisungen. Nmap wird automatisch mitinstalliert.
 
