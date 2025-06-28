@@ -9,6 +9,10 @@ on:
 # WAS soll der Roboter tun?
 jobs:
   build:
+    # --- ÄNDERUNG HIER: Wir geben dem Roboter explizit Schreibrechte ---
+    permissions:
+      contents: write # Erlaubt das Schreiben in das Repository, z.B. das Hochladen zu Releases.
+
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
@@ -40,15 +44,13 @@ jobs:
       - name: Führe das Build-Skript aus
         run: python main.py --build
 
-      # --- ÄNDERUNG HIER: Wir verwenden jetzt Outputs statt env-Variablen ---
       # 6. Schritt: Verpacke das Ergebnis und erzeuge Outputs
       - name: Ergebnis verpacken und Outputs festlegen
-        id: package # Die ID ist wichtig, damit wir die Outputs referenzieren können
+        id: package
         run: |
           if ("${{ runner.os }}" -eq "Windows") {
             $ASSET_NAME = "Netzwerk-Scanner-Pro-Windows.exe"
             mv dist/Netzwerk-Scanner-Pro.exe dist/$ASSET_NAME
-            # Schreibe die Werte in die GITHUB_OUTPUT Datei
             "ASSET_PATH=dist/$ASSET_NAME" >> $env:GITHUB_OUTPUT
             "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_OUTPUT
             "ASSET_CONTENT_TYPE=application/octet-stream" >> $env:GITHUB_OUTPUT
@@ -58,14 +60,12 @@ jobs:
             cd dist
             zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
             cd ..
-            # Schreibe die Werte in die GITHUB_OUTPUT Datei
             "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_OUTPUT
             "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_OUTPUT
             "ASSET_CONTENT_TYPE=application/zip" >> $env:GITHUB_OUTPUT
           }
         shell: pwsh
 
-      # --- ÄNDERUNG HIER: Wir lesen jetzt die Outputs statt env-Variablen ---
       # 7. Schritt: Lade das fertige Paket zur Release-Seite hoch
       - name: Lade fertiges Paket hoch
         uses: actions/upload-release-asset@v1
