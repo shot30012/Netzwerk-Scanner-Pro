@@ -48,7 +48,9 @@ jobs:
         run: python main.py --build
 
       # 6. Schritt: Verpacke das Ergebnis schön
-      - name: Ergebnis verpacken
+      # --- HIER IST DIE ERSTE ÄNDERUNG ---
+      # Wir fügen hier hinzu, WELCHEN DATEITYP (Content-Type) wir haben.
+      - name: Ergebnis verpacken und Dateityp festlegen
         id: package
         run: |
           # Wenn wir auf der Windows-Werkbank sind...
@@ -57,9 +59,10 @@ jobs:
             $ASSET_NAME = "Netzwerk-Scanner-Pro-Windows.exe"
             # Benenne die Datei um, damit klar ist, dass sie für Windows ist
             mv $ARTIFACT_PATH dist/$ASSET_NAME
-            # Sag dem nächsten Schritt den neuen Namen
+            # Sag dem nächsten Schritt den neuen Namen und den Dateityp
             echo "ASSET_PATH=dist/$ASSET_NAME" >> $env:GITHUB_ENV
             echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
+            echo "ASSET_CONTENT_TYPE=application/octet-stream" >> $env:GITHUB_ENV
           }
           # Wenn wir auf der Mac-Werkbank sind...
           else {
@@ -69,13 +72,16 @@ jobs:
             cd dist
             zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
             cd ..
-            # Sag dem nächsten Schritt den neuen Namen
+            # Sag dem nächsten Schritt den neuen Namen und den Dateityp
             echo "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_ENV
             echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_ENV
+            echo "ASSET_CONTENT_TYPE=application/zip" >> $env:GITHUB_ENV
           }
         shell: pwsh # Wir verwenden PowerShell für beide Systeme, das macht es einfacher
 
       # 7. Schritt: Lade das fertige Paket zur Release-Seite hoch
+      # --- HIER IST DIE ZWEITE ÄNDERUNG ---
+      # Wir verwenden jetzt den Dateityp (Content-Type), den wir oben festgelegt haben.
       - name: Lade fertiges Paket hoch
         uses: actions/upload-release-asset@v1
         env:
@@ -84,3 +90,4 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ${{ env.ASSET_PATH }}
           asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
