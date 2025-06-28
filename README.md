@@ -7,7 +7,7 @@ Netzwerk-Scanner Pro
 Ein benutzerfreundlicher, grafischer Netzwerk-Scanner für Windows und macOS, geschrieben in Python mit PySide6. Dieses Tool ermöglicht es, schnell und effizient aktive Hosts in einem Netzwerk zu entdecken und deren offene Ports zu überprüfen.
 ![alt text](screenshot-hosts.png)
 
-✨ Hauptfunktionen
+#✨ Hauptfunktionen
 Automatische Netzwerkerkennung: Schlägt beim Start automatisch den lokalen Netzwerkbereich als Scan-Ziel vor.
 Host Discovery: Findet aktive Hosts im Zielnetzwerk und zeigt IP-Adressen sowie (falls auflösbar) Hostnamen an.
 Multi-Threaded Port-Scanner: Scannt ausgewählte Hosts mit hoher Geschwindigkeit auf offene Ports.
@@ -19,7 +19,7 @@ Benutzerdefiniert: Ermöglicht die Angabe eigener Ports und Bereiche (z.B. 80, 4
 Leistungsstarke Diensterkennung: Nutzt die Power von Nmap im Hintergrund, um Dienste und deren Versionen auf offenen Ports zu identifizieren.
 Daten-Export: Speichert die detaillierten Scan-Ergebnisse als übersichtliche .csv-Datei zur weiteren Analyse.
 Plattformübergreifend: Bietet native Builds für Windows und macOS.
-🚀 Download & Installation
+#🚀 Download & Installation
 Die neueste Version kann einfach über die Releases-Seite heruntergeladen werden.
 ➡️ Zur neuesten Release-Version
 Windows
@@ -29,11 +29,11 @@ macOS
 Laden Sie die Netzwerk-Scanner-Pro-macOS.zip herunter und entpacken Sie sie.
 Ziehen Sie die Netzwerk-Scanner Pro.app in Ihren Programme-Ordner.
 Wichtiger Hinweis: macOS Gatekeeper wird den Start blockieren. Um die App zu öffnen, machen Sie einen Rechtsklick auf das App-Icon, wählen Sie im Kontextmenü "Öffnen" und bestätigen Sie im Dialogfenster erneut mit "Öffnen". Dies ist nur beim allerersten Start notwendig.
-💡 Benutzung
+#💡 Benutzung
 Ziel eingeben: Starten Sie die Anwendung. Der lokale Netzwerkbereich ist bereits vorausgefüllt. Passen Sie ihn bei Bedarf an.
 Netzwerk scannen: Klicken Sie auf "Netzwerk Scannen", um nach aktiven Geräten zu suchen. Diese erscheinen in der Liste "Gefundene Hosts".
 Ports überprüfen: Wählen Sie einen Scan-Typ (z.B. "Schnell") und klicken Sie dann auf einen Host in der Liste, um dessen Ports zu scannen. Die Ergebnisse werden in der Tabelle rechts angezeigt.
-🛠️ Für Entwickler: Aus dem Quellcode bauen
+#🛠️ Für Entwickler: Aus dem Quellcode bauen
 Möchten Sie das Projekt selbst kompilieren oder weiterentwickeln?
 Voraussetzungen:
 Python 3.9+
@@ -66,7 +66,7 @@ python main.py --build
 Use code with caution.
 Bash
 Die fertigen Dateien finden Sie anschließend im dist-Ordner.
-⚠️ Hinweis zu Antiviren-Programmen
+#⚠️ Hinweis zu Antiviren-Programmen
 Da dieses Tool Netzwerk-Scan-Funktionen (wie Nmap) nutzt, die auch für bösartige Zwecke verwendet werden können, könnten einige Antivirenprogramme eine Warnung (False Positive) anzeigen. Dies ist zu erwarten, da die Anwendung nicht kommerziell signiert und noch nicht weit verbreitet ist. Der Quellcode ist vollständig einsehbar und sicher.
-📜 Lizenz
+#📜 Lizenz
 Dieses Projekt steht unter der MIT License.
