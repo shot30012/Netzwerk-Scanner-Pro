@@ -1,0 +1,64 @@
+name: Deploy Website to GitHub Pages
+
+# WANN soll dieser Roboter starten?
+# Immer dann, wenn ein Release veröffentlicht wird.
+on:
+  release:
+    types: [published]
+
+# Welche BERECHTIGUNGEN braucht der Roboter?
+# Dies ist für die modernen GitHub Pages Aktionen zwingend erforderlich.
+permissions:
+  contents: read      # Erlaubnis, den Code auszuchecken.
+  pages: write         # Erlaubnis, die Webseite zu veröffentlichen.
+  id-token: write      # Erlaubnis, sich sicher als GitHub Action zu authentifizieren.
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # Schritt 1: Code herunterladen
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Schritt 2: GitHub Pages vorbereiten
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      # Schritt 3: Webseite aus der Vorlage generieren
+      # Das ist die "Magie": Wir ersetzen die Platzhalter.
+      - name: Generate Website from Template
+        run: |
+          # Finde die Download-URL für die Windows-Datei im Release-Event
+          WINDOWS_URL=$(echo '${{ toJSON(github.event.release.assets) }}' | jq -r '.[] | select(.name | contains("Windows")) | .browser_download_url')
+          
+          # Finde die Download-URL für die macOS-Datei
+          MACOS_URL=$(echo '${{ toJSON(github.event.release.assets) }}' | jq -r '.[] | select(.name | contains("macOS")) | .browser_download_url')
+
+          # Kopiere die Vorlage, um sie zu bearbeiten
+          cp _site_template/index.template.html ./index.html
+
+          # Ersetze die Platzhalter mit den echten Daten
+          sed -i 's|{{VERSION}}|${{ github.event.release.tag_name }}|g' index.html
+          sed -i 's|{{WINDOWS_URL}}|'$WINDOWS_URL'|g' index.html
+          sed -i 's|{{MACOS_URL}}|'$MACOS_URL'|g' index.html
+          
+          echo "Webseite generiert für Version ${{ github.event.release.tag_name }}"
+
+      # Schritt 4: Die fertige Webseite als "Artefakt" hochladen
+      # Ein Artefakt ist ein Ergebnis eines Jobs, das andere Schritte nutzen können.
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Wir laden den Inhalt des Hauptverzeichnisses hoch, wo unsere index.html jetzt liegt
+          path: '.'
+
+      # Schritt 5: Das Artefakt auf GitHub Pages veröffentlichen
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
