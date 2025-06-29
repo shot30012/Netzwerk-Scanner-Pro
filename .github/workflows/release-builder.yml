@@ -97,8 +97,9 @@ jobs:
         shell: pwsh
       
       # 9. Fertiges Paket zum Release hochladen
+            # 9. Fertiges Paket zum Release hochladen
       - name: Lade fertiges Paket hoch (via GitHub CLI)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.event.release.tag_name }} ${{ steps.package.outputs.ASSET_PATH }} --name "${{ steps.package.outputs.ASSET_NAME }}" --clobber
+          gh release upload ${{ github.event.release.tag_name }} ${{ steps.package.outputs.ASSET_PATH }} --clobber
