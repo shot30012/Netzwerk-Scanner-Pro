@@ -1,78 +1,83 @@
-# Der Name unseres Bauplans
 name: Baue Windows & macOS Version
 
-# WANN soll der Roboter starten?
 on:
   release:
     types: [published]
 
-# WAS soll der Roboter tun?
 jobs:
   build:
-    # --- ÄNDERUNG HIER: Wir geben dem Roboter explizit Schreibrechte ---
     permissions:
-      contents: write # Erlaubt das Schreiben in das Repository, z.B. das Hochladen zu Releases.
+      contents: write
 
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
+
     runs-on: ${{ matrix.os }}
 
     steps:
-      # 1. Schritt: Hole den Code
+      # 1. Code herunterladen
       - name: Lade den Quellcode herunter
         uses: actions/checkout@v4
 
-      # 2. Schritt: Richte die Python-Werkstatt ein
+      # 2. Python einrichten
       - name: Installiere Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Schritt: Installiere die Python-Werkzeuge von der Einkaufsliste
+      # 3. Python-Pakete installieren
       - name: Installiere Python-Pakete
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Schritt: Installiere Nmap (nur auf der Mac-Werkbank)
-      - name: Installiere Nmap (nur für macOS)
+      # 4. Betriebssystem-spezifische Vorbereitungen
+      - name: Windows-spezifische Vorbereitungen (Inno Setup)
+        if: runner.os == 'Windows'
+        run: choco install innosetup --version=6.2.2 -y
+        shell: pwsh
+
+      - name: macOS-spezifische Vorbereitungen (Nmap)
         if: runner.os == 'macOS'
         run: brew install nmap
 
-      # 5. Schritt: Baue das eigentliche Programm zusammen
-      - name: Führe das Build-Skript aus
+      # 5. Anwendung mit PyInstaller bauen
+      - name: Führe das PyInstaller Build-Skript aus
         run: python main.py --build
 
-      # 6. Schritt: Verpacke das Ergebnis und erzeuge Outputs
+      # 6. Windows Installer mit Inno Setup erstellen
+      - name: Erstelle Windows Installer
+        if: runner.os == 'Windows'
+        run: |
+          # Der Pfad zum Inno Setup Compiler
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" "setup.iss"
+        shell: pwsh
+
+      # 7. Ergebnis verpacken und Outputs festlegen
       - name: Ergebnis verpacken und Outputs festlegen
         id: package
         run: |
           if ("${{ runner.os }}" -eq "Windows") {
-            $ASSET_NAME = "Netzwerk-Scanner-Pro-Windows.exe"
-            mv dist/Netzwerk-Scanner-Pro.exe dist/$ASSET_NAME
-            "ASSET_PATH=dist/$ASSET_NAME" >> $env:GITHUB_OUTPUT
-            "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_OUTPUT
-            "ASSET_CONTENT_TYPE=application/octet-stream" >> $env:GITHUB_OUTPUT
+            # Der Pfad zur fertigen Installer-Datei
+            echo "ASSET_PATH=Output/Netzwerk-Scanner-Pro-Setup.exe" >> $env:GITHUB_OUTPUT
+            # Der Name, den die Datei im Release haben soll
+            echo "ASSET_NAME=Netzwerk-Scanner-Pro-Windows-Setup.exe" >> $env:GITHUB_OUTPUT
           }
           else {
+            # Für macOS bleibt es bei der ZIP-Datei der .app
             $ASSET_NAME = "Netzwerk-Scanner-Pro-macOS.zip"
             cd dist
             zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
             cd ..
-            "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_OUTPUT
-            "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_OUTPUT
-            "ASSET_CONTENT_TYPE=application/zip" >> $env:GITHUB_OUTPUT
+            echo "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_OUTPUT
+            echo "ASSET_NAME=$ASSET_NAME" >> $env:GITHUB_OUTPUT
           }
         shell: pwsh
-
-      # 7. Schritt: Lade das fertige Paket zur Release-Seite hoch
-      - name: Lade fertiges Paket hoch
-        uses: actions/upload-release-asset@v1
+      
+      # 8. Fertiges Paket zum Release hochladen
+      - name: Lade fertiges Paket hoch (via GitHub CLI)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ${{ steps.package.outputs.ASSET_PATH }}
-          asset_name: ${{ steps.package.outputs.ASSET_NAME }}
-          asset_content_type: ${{ steps.package.outputs.ASSET_CONTENT_TYPE }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} ${{ steps.package.outputs.ASSET_PATH }} --name "${{ steps.package.outputs.ASSET_NAME }}" --clobber
