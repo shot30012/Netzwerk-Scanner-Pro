@@ -473,7 +473,6 @@ def build_application():
     if system == "windows":
         print(">>> Konfiguriere für Windows...")
         command = base_command + [
-            "--onefile",
             f"--icon={os.path.join('icons', 'target.ico')}",
             "--manifest=admin.manifest"
         ]
