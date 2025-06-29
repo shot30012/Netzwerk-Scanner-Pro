@@ -3,20 +3,26 @@
 ![Lizenz](https://img.shields.io/github/license/shot30012/Netzwerk-Scanner-Pro)
 ![Letztes Release](https://img.shields.io/github/v/release/shot30012/Netzwerk-Scanner-Pro)
 ![Plattformen](https://img.shields.io/badge/Plattform-Windows%20%7C%20macOS-blue)
+![Downloads](https://img.shields.io/github/downloads/shot30012/Netzwerk-Scanner-Pro/total)
 
 Ein benutzerfreundlicher, plattformübergreifender Netzwerk-Scanner mit grafischer Oberfläche, geschrieben in Python und PySide6. Entdecken Sie schnell und effizient aktive Geräte in Ihrem Netzwerk und überprüfen Sie deren offene Ports.
 
 ---
 
 ![Screenshot der Anwendung](screenshot-hosts.png)
+*(Stellen Sie sicher, dass eine Datei `screenshot-hosts.png` in Ihrem Repository existiert)*
 
 ---
 
 ## 🚀 Download
 
-Die neueste Version ist immer hier verfügbar:
+Die neueste Version ist immer hier verfügbar. Einfach auf den Button klicken:
 
-**➡️ [Zur neuesten Release-Version](https://github.com/shot30012/Netzwerk-Scanner-Pro/releases/latest)**
+<p align="center">
+  <a href="https://github.com/shot30012/Netzwerk-Scanner-Pro/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Neueste%20Version-brightgreen?style=for-the-badge&logo=github" alt="Download Latest Version">
+  </a>
+</p>
 
 ---
 
@@ -94,10 +100,11 @@ Um die ausführbaren Dateien für Ihr Betriebssystem zu erstellen, führen Sie d
 ```bash
 python main.py --build
 
-
 Die fertigen Pakete finden Sie anschließend im dist-Ordner (und Output für den Windows-Installer).
 </details>
 ⚠️ Hinweis zu Antiviren-Programmen
 Da dieses Tool legitime Netzwerk-Scan-Funktionen nutzt, könnten einige Antivirenprogramme eine Warnung (False Positive) anzeigen. Dies ist zu erwarten, da die Anwendung nicht kommerziell signiert ist. Der Quellcode ist vollständig einsehbar und sicher.
 📜 Lizenz
 Dieses Projekt steht unter der MIT License.
+Generated code
+
