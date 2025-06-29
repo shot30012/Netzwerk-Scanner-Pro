@@ -9,7 +9,6 @@ Ein benutzerfreundlicher, plattformübergreifender Netzwerk-Scanner mit grafisch
 ---
 
 ![Screenshot der Anwendung](screenshot-hosts.png)
-*(Stellen Sie sicher, dass eine Datei `screenshot-hosts.png` in Ihrem Repository existiert)*
 
 ---
 
