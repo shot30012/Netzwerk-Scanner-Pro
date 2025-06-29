@@ -55,6 +55,7 @@ jobs:
           echo "Kopiere installierte Nmap-Dateien..."
           Copy-Item -Path "$NMAP_INSTALL_PATH\*" -Destination "dependencies\nmap_unpacked" -Recurse
         shell: pwsh
+        
       # 5. macOS: Nmap installieren
       - name: macOS-spezifische Vorbereitungen
         if: runner.os == 'macOS'
