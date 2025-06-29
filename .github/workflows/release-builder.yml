@@ -32,43 +32,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Windows: Inno Setup & Nmap vorbereiten
+      # 4. Windows: Benötigte Werkzeuge mit Chocolatey installieren
       - name: Windows-spezifische Vorbereitungen
         if: runner.os == 'Windows'
         run: |
-          # Installiere Inno Setup, falls noch nicht geschehen
-          choco install innosetup -y --force
+          # Installiere Inno Setup UND Nmap mit einem einzigen, sauberen Befehl.
+          # Chocolatey kümmert sich um den Download, die Installation und den Pfad.
+          choco install innosetup nmap -y
           
-          $NMAP_URL = "https://nmap.org/dist/nmap-7.95-setup.exe"
-          $NMAP_INSTALLER_PATH = "nmap-setup.exe"
-          
-          echo "Lade Nmap von $NMAP_URL herunter..."
-          Invoke-WebRequest -Uri $NMAP_URL -OutFile $NMAP_INSTALLER_PATH
-          
-          # --- DER NEUE, VERBESSERTE INSTALLATIONSBEFEHL ---
-          echo "Installiere Nmap im Silent Mode mit expliziten Komponenten..."
-          # /S                 = Silent Mode
-          # /D=C:\Nmap         = Installiere es in einen einfachen Pfad, um Probleme mit Leerzeichen zu vermeiden
-          # /currentuser       = Macht die Installation manchmal zuverlässiger in automatisierten Umgebungen
-          $INSTALL_ARGS = '/S /D=C:\Nmap'
-          Start-Process -FilePath $NMAP_INSTALLER_PATH -ArgumentList $INSTALL_ARGS -Wait -PassThru
-          
-          echo "Nmap-Installation abgeschlossen. Überprüfe den Erfolg..."
-
-          # Wir suchen jetzt im neuen, einfachen Pfad
-          $NMAP_EXE_PATH = "C:\Nmap\nmap.exe"
-          if (-not (Test-Path $NMAP_EXE_PATH)) {
-            echo "FEHLER: Nmap wurde nicht erfolgreich installiert. Die Datei $NMAP_EXE_PATH wurde nicht gefunden."
-            # Wir listen den Inhalt von C:\ auf, um zu sehen, was schiefgelaufen ist
-            Get-ChildItem -Path C:\ | ForEach-Object { Write-Host $_.Name }
+          # Wir müssen die Nmap-Dateien immer noch für unseren Installer kopieren.
+          # Choco installiert Nmap standardmäßig nach C:\Program Files (x86)\Nmap oder C:\ProgramData\chocolatey\lib\nmap\tools
+          # Wir suchen nach dem Installationspfad.
+          $NMAP_PATH = (Get-Command nmap).Source | Split-Path
+          if (-not $NMAP_PATH) {
+            echo "FEHLER: Nmap wurde von Chocolatey nicht gefunden."
             exit 1
           }
-          echo "Nmap erfolgreich unter $NMAP_EXE_PATH gefunden."
+          echo "Nmap gefunden in: $NMAP_PATH"
 
-          # Der Rest bleibt gleich, aber wir kopieren vom neuen Pfad
           New-Item -ItemType Directory -Force -Path "dependencies/nmap_unpacked"
           echo "Kopiere installierte Nmap-Dateien..."
-          Copy-Item -Path "C:\Nmap\*" -Destination "dependencies\nmap_unpacked" -Recurse
+          Copy-Item -Path "$NMAP_PATH\*" -Destination "dependencies\nmap_unpacked" -Recurse
         shell: pwsh
       # 5. macOS: Nmap installieren
       - name: macOS-spezifische Vorbereitungen
