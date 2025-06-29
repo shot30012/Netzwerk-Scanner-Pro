@@ -32,40 +32,61 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Betriebssystem-spezifische Vorbereitungen
-      - name: Windows-spezifische Vorbereitungen (Inno Setup)
+      # 4. Windows: Inno Setup & Nmap vorbereiten
+      - name: Windows-spezifische Vorbereitungen
         if: runner.os == 'Windows'
-        run: choco install innosetup --version=6.2.2 -y
+        run: |
+          # Installiere Inno Setup für den Installer-Bau
+          choco install innosetup --version=6.2.2 -y
+          
+          # Definiere die URL zum offiziellen Nmap-Installer
+          $NMAP_URL = "https://nmap.org/dist/nmap-7.95-setup.exe"
+          $NMAP_INSTALLER_PATH = "nmap-setup.exe"
+          
+          # Lade den Installer direkt von nmap.org herunter
+          echo "Lade Nmap von $NMAP_URL herunter..."
+          Invoke-WebRequest -Uri $NMAP_URL -OutFile $NMAP_INSTALLER_PATH
+          
+          # Führe den heruntergeladenen Installer im "Silent Mode" aus
+          echo "Installiere Nmap im Silent Mode..."
+          Start-Process -FilePath $NMAP_INSTALLER_PATH -ArgumentList "/S" -Wait
+          
+          # Gib dem Installer einen Moment Zeit, um fertig zu werden
+          Start-Sleep -Seconds 10
+          
+          # Erstelle einen temporären Ordner für die installierten Nmap-Dateien
+          New-Item -ItemType Directory -Force -Path "dependencies/nmap_unpacked"
+          
+          # Kopiere die installierten Nmap-Dateien aus dem Programme-Ordner
+          echo "Kopiere installierte Nmap-Dateien..."
+          Copy-Item -Path "C:\Program Files (x86)\Nmap\*" -Destination "dependencies\nmap_unpacked" -Recurse
         shell: pwsh
 
-      - name: macOS-spezifische Vorbereitungen (Nmap)
+      # 5. macOS: Nmap installieren
+      - name: macOS-spezifische Vorbereitungen
         if: runner.os == 'macOS'
         run: brew install nmap
 
-      # 5. Anwendung mit PyInstaller bauen
+      # 6. Anwendung mit PyInstaller bauen
       - name: Führe das PyInstaller Build-Skript aus
         run: python main.py --build
 
-      # 6. Windows Installer mit Inno Setup erstellen
+      # 7. Windows Installer mit Inno Setup erstellen
       - name: Erstelle Windows Installer
         if: runner.os == 'Windows'
         run: |
-          # Der Pfad zum Inno Setup Compiler
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" "setup.iss"
         shell: pwsh
 
-      # 7. Ergebnis verpacken und Outputs festlegen
+      # 8. Ergebnis verpacken und Outputs festlegen
       - name: Ergebnis verpacken und Outputs festlegen
         id: package
         run: |
           if ("${{ runner.os }}" -eq "Windows") {
-            # Der Pfad zur fertigen Installer-Datei
             echo "ASSET_PATH=Output/Netzwerk-Scanner-Pro-Setup.exe" >> $env:GITHUB_OUTPUT
-            # Der Name, den die Datei im Release haben soll
             echo "ASSET_NAME=Netzwerk-Scanner-Pro-Windows-Setup.exe" >> $env:GITHUB_OUTPUT
           }
           else {
-            # Für macOS bleibt es bei der ZIP-Datei der .app
             $ASSET_NAME = "Netzwerk-Scanner-Pro-macOS.zip"
             cd dist
             zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
@@ -75,7 +96,7 @@ jobs:
           }
         shell: pwsh
       
-      # 8. Fertiges Paket zum Release hochladen
+      # 9. Fertiges Paket zum Release hochladen
       - name: Lade fertiges Paket hoch (via GitHub CLI)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
