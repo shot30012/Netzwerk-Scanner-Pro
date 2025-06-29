@@ -36,9 +36,8 @@ jobs:
       - name: Windows-spezifische Vorbereitungen
         if: runner.os == 'Windows'
         run: |
-          # Installiere Inno Setup. Wir entfernen die Versionssperre, um den Fehler zu vermeiden.
-          # Choco wird einfach die neueste verfügbare Version nehmen.
-          choco install innosetup -y
+          # Installiere Inno Setup, falls noch nicht geschehen
+          choco install innosetup -y --force
           
           $NMAP_URL = "https://nmap.org/dist/nmap-7.95-setup.exe"
           $NMAP_INSTALLER_PATH = "nmap-setup.exe"
@@ -46,26 +45,30 @@ jobs:
           echo "Lade Nmap von $NMAP_URL herunter..."
           Invoke-WebRequest -Uri $NMAP_URL -OutFile $NMAP_INSTALLER_PATH
           
-          # --- NEUE, ROBUSTERE INSTALLATIONSMETHODE ---
-          echo "Installiere Nmap im Silent Mode (entkoppelt)..."
-          # Wir entfernen -Wait und verwenden stattdessen eine feste Wartezeit.
-          Start-Process -FilePath $NMAP_INSTALLER_PATH -ArgumentList "/S"
+          # --- DER NEUE, VERBESSERTE INSTALLATIONSBEFEHL ---
+          echo "Installiere Nmap im Silent Mode mit expliziten Komponenten..."
+          # /S                 = Silent Mode
+          # /D=C:\Nmap         = Installiere es in einen einfachen Pfad, um Probleme mit Leerzeichen zu vermeiden
+          # /currentuser       = Macht die Installation manchmal zuverlässiger in automatisierten Umgebungen
+          $INSTALL_ARGS = '/S /D=C:\Nmap'
+          Start-Process -FilePath $NMAP_INSTALLER_PATH -ArgumentList $INSTALL_ARGS -Wait -PassThru
           
-          echo "Warte 30 Sekunden, damit der Nmap-Installer sicher fertig wird..."
-          Start-Sleep -Seconds 30
-          
-          # Überprüfe, ob die Installation erfolgreich war, indem wir nach der nmap.exe suchen
-          $NMAP_EXE_PATH = "C:\Program Files (x86)\Nmap\nmap.exe"
+          echo "Nmap-Installation abgeschlossen. Überprüfe den Erfolg..."
+
+          # Wir suchen jetzt im neuen, einfachen Pfad
+          $NMAP_EXE_PATH = "C:\Nmap\nmap.exe"
           if (-not (Test-Path $NMAP_EXE_PATH)) {
             echo "FEHLER: Nmap wurde nicht erfolgreich installiert. Die Datei $NMAP_EXE_PATH wurde nicht gefunden."
+            # Wir listen den Inhalt von C:\ auf, um zu sehen, was schiefgelaufen ist
+            Get-ChildItem -Path C:\ | ForEach-Object { Write-Host $_.Name }
             exit 1
           }
-          echo "Nmap erfolgreich installiert."
+          echo "Nmap erfolgreich unter $NMAP_EXE_PATH gefunden."
 
-          # Der Rest bleibt gleich
+          # Der Rest bleibt gleich, aber wir kopieren vom neuen Pfad
           New-Item -ItemType Directory -Force -Path "dependencies/nmap_unpacked"
           echo "Kopiere installierte Nmap-Dateien..."
-          Copy-Item -Path "C:\Program Files (x86)\Nmap\*" -Destination "dependencies\nmap_unpacked" -Recurse
+          Copy-Item -Path "C:\Nmap\*" -Destination "dependencies\nmap_unpacked" -Recurse
         shell: pwsh
       # 5. macOS: Nmap installieren
       - name: macOS-spezifische Vorbereitungen
