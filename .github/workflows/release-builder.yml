@@ -37,22 +37,23 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           # Installiere Inno Setup UND Nmap mit einem einzigen, sauberen Befehl.
-          # Chocolatey kümmert sich um den Download, die Installation und den Pfad.
           choco install innosetup nmap -y
           
-          # Wir müssen die Nmap-Dateien immer noch für unseren Installer kopieren.
-          # Choco installiert Nmap standardmäßig nach C:\Program Files (x86)\Nmap oder C:\ProgramData\chocolatey\lib\nmap\tools
-          # Wir suchen nach dem Installationspfad.
-          $NMAP_PATH = (Get-Command nmap).Source | Split-Path
-          if (-not $NMAP_PATH) {
-            echo "FEHLER: Nmap wurde von Chocolatey nicht gefunden."
+          # Wir wissen jetzt, dass Choco Nmap immer hierhin installiert.
+          # Daher verwenden wir den Pfad direkt, anstatt dynamisch danach zu suchen.
+          $NMAP_INSTALL_PATH = "C:\Program Files (x86)\Nmap"
+          
+          # Sicherheitsüberprüfung: Existiert der Ordner wirklich?
+          if (-not (Test-Path $NMAP_INSTALL_PATH)) {
+            echo "FEHLER: Nmap-Installationsordner wurde nicht unter $NMAP_INSTALL_PATH gefunden."
             exit 1
           }
-          echo "Nmap gefunden in: $NMAP_PATH"
+          echo "Nmap-Installationsordner gefunden unter: $NMAP_INSTALL_PATH"
 
+          # Erstelle unseren temporären Ordner und kopiere die Dateien.
           New-Item -ItemType Directory -Force -Path "dependencies/nmap_unpacked"
           echo "Kopiere installierte Nmap-Dateien..."
-          Copy-Item -Path "$NMAP_PATH\*" -Destination "dependencies\nmap_unpacked" -Recurse
+          Copy-Item -Path "$NMAP_INSTALL_PATH\*" -Destination "dependencies\nmap_unpacked" -Recurse
         shell: pwsh
       # 5. macOS: Nmap installieren
       - name: macOS-spezifische Vorbereitungen
