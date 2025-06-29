@@ -39,8 +39,8 @@ jobs:
           # Installiere Inno Setup UND Nmap mit einem einzigen, sauberen Befehl.
           choco install innosetup nmap -y
           
-          # Wir wissen jetzt, dass Choco Nmap immer hierhin installiert.
-          # Daher verwenden wir den Pfad direkt, anstatt dynamisch danach zu suchen.
+          # Wir wissen, dass Choco Nmap standardmäßig hierhin installiert.
+          # Daher verwenden wir den Pfad direkt, um Probleme mit der PATH-Variable zu umgehen.
           $NMAP_INSTALL_PATH = "C:\Program Files (x86)\Nmap"
           
           # Sicherheitsüberprüfung: Existiert der Ordner wirklich?
@@ -50,13 +50,13 @@ jobs:
           }
           echo "Nmap-Installationsordner gefunden unter: $NMAP_INSTALL_PATH"
 
-          # Erstelle unseren temporären Ordner und kopiere die Dateien.
+          # Erstelle unseren temporären Ordner und kopiere die Nmap-Dateien hinein.
           New-Item -ItemType Directory -Force -Path "dependencies/nmap_unpacked"
           echo "Kopiere installierte Nmap-Dateien..."
           Copy-Item -Path "$NMAP_INSTALL_PATH\*" -Destination "dependencies\nmap_unpacked" -Recurse
         shell: pwsh
         
-      # 5. macOS: Nmap installieren
+      # 5. macOS: Nmap mit Homebrew installieren
       - name: macOS-spezifische Vorbereitungen
         if: runner.os == 'macOS'
         run: brew install nmap
@@ -72,18 +72,20 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" "setup.iss"
         shell: pwsh
 
-       # 8. Ergebnis verpacken und Outputs festlegen
+      # 8. Ergebnis verpacken und Pfad für den Upload festlegen
       - name: Ergebnis verpacken und Outputs festlegen
         id: package
         run: |
           if ("${{ runner.os }}" -eq "Windows") {
+            # Der Inno Setup Installer liegt im "Output"-Ordner.
             $SOURCE_PATH = "Output/Netzwerk-Scanner-Pro-Setup.exe"
+            # Wir benennen ihn für das Release um.
             $FINAL_NAME = "Netzwerk-Scanner-Pro-Windows-Setup.exe"
-            # Benenne die Datei um, damit sie einen besseren Namen im Release hat
             mv $SOURCE_PATH "Output/$FINAL_NAME"
             echo "ASSET_PATH=Output/$FINAL_NAME" >> $env:GITHUB_OUTPUT
           }
           else {
+            # Für macOS zippen wir die .app-Datei.
             $ASSET_NAME = "Netzwerk-Scanner-Pro-macOS.zip"
             cd dist
             zip -r ../$ASSET_NAME "Netzwerk-Scanner Pro.app"
@@ -91,8 +93,8 @@ jobs:
             echo "ASSET_PATH=$ASSET_NAME" >> $env:GITHUB_OUTPUT
           }
         shell: pwsh
+      
       # 9. Fertiges Paket zum Release hochladen
-            # 9. Fertiges Paket zum Release hochladen
       - name: Lade fertiges Paket hoch (via GitHub CLI)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
